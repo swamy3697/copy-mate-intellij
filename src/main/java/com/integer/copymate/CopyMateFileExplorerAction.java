@@ -22,6 +22,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+
+
 public class CopyMateFileExplorerAction extends AnAction {
 
     @Override
@@ -44,7 +46,7 @@ public class CopyMateFileExplorerAction extends AnAction {
         public FileSelectionDialog(Project project) {
             super(project);
             this.project = project;
-            setTitle("Copy Mate - File Explorer");
+            setTitle("Copy Mate (Select File To Copy)");
             setModal(true);
             init();
         }

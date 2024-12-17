@@ -15,8 +15,10 @@
     <action id="CopyMate"
             class="com.integer.copymate.CopyMateFileExplorerAction"
             text="Copy Mate"
+            icon="/icon.png"
             description="Open the file explorer with checkboxes to copy files">
       <add-to-group group-id="ToolsMenu" anchor="last" />
     </action>
   </actions>
+
 </idea-plugin>

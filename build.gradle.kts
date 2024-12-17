@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.integer"
-version = "1.0-SNAPSHOT"
+version = "1.0-Mark-01"
 
 repositories {
   mavenCentral()
