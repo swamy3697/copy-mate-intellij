@@ -1,0 +1,22 @@
+<idea-plugin>
+  <id>com.integer.copy-mate</id>
+  <name>Copy-mate</name>
+  <vendor email="swamyp2002@gmail.com" >Swamy Penupothula</vendor>
+
+  <description><![CDATA[
+        A plugin to copy content from multiple files in the project.<br>
+        <em>Display files with checkboxes for selection.</em>
+    ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <!-- Register a new action to open the file explorer in the Project view -->
+  <actions>
+    <action id="CopyMate"
+            class="com.integer.copymate.CopyMateFileExplorerAction"
+            text="Copy Mate"
+            description="Open the file explorer with checkboxes to copy files">
+      <add-to-group group-id="ToolsMenu" anchor="last" />
+    </action>
+  </actions>
+</idea-plugin>
