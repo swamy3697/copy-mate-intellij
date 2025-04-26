@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.integer"
-version = "1.0-Mark-01"
+version = "2.0-Mark-01"
 
 repositories {
   mavenCentral()
@@ -31,8 +31,8 @@ tasks {
   }
 
   patchPluginXml {
-    sinceBuild.set("241")
-    untilBuild.set("243.*")
+    sinceBuild.set("221") // Support from 2022.1 onwards
+    untilBuild.set("500.*") // Support for future versions up to 500
   }
 
   signPlugin {

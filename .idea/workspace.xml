@@ -7,8 +7,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7383c973-3a6b-4d03-87a8-f105daa4af26" name="Changes" comment="commiting">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="7383c973-3a6b-4d03-87a8-f105daa4af26" name="Changes" comment="added copy file struture feature">
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/integer/copymate/CopyMateFileExplorerAction.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/integer/copymate/CopyMateFileExplorerAction.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" afterDir="false" />
@@ -116,6 +117,15 @@
       <updated>1734453534442</updated>
       <workItem from="1734453536112" duration="21000" />
     </task>
+    <task id="LOCAL-00001" summary="added copy file struture feature">
+      <option name="closed" value="true" />
+      <created>1745656403435</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1745656403435</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -128,5 +138,9 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="added copy file struture feature" />
+    <option name="LAST_COMMIT_MESSAGE" value="added copy file struture feature" />
   </component>
 </project>

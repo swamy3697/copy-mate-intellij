@@ -6,9 +6,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.vfs.VirtualFile;
-
-
-
 import com.intellij.ui.CheckboxTree;
 import com.intellij.ui.CheckedTreeNode;
 import com.intellij.ui.ColoredTreeCellRenderer;
@@ -17,8 +14,7 @@ import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.TreePath;
+import javax.swing.border.TitledBorder;
 import javax.swing.tree.TreeSelectionModel;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
@@ -26,9 +22,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CopyMateFileExplorerAction extends AnAction {
 
@@ -48,20 +44,40 @@ public class CopyMateFileExplorerAction extends AnAction {
         private final Project project;
         private CheckboxTree fileTree;
         private CheckedTreeNode rootNode;
-        private Map<VirtualFile, JBCheckBox> methodSignatureCheckboxes;
+        private JBCheckBox copyMethodsOnlyCheckbox;
+        private boolean isJavaAvailable;
 
         public FileSelectionDialog(Project project) {
             super(project);
             this.project = project;
-            this.methodSignatureCheckboxes = new HashMap<>();
-            setTitle("Copy Mate (Select File To Copy)");
+            setTitle("Copy Mate (Select Files To Copy)");
             setModal(true);
+
+            // Check if Java functionality is available in this IDE
+            isJavaAvailable = isJavaPluginAvailable();
+
             init();
+        }
+
+        /**
+         * Check if Java functionality is available in the current IDE
+         * This handles cross-IDE compatibility
+         */
+        private boolean isJavaPluginAvailable() {
+            try {
+                // Try to load a Java-specific class
+                Class.forName("com.intellij.psi.PsiJavaFile");
+                return true;
+            } catch (ClassNotFoundException e) {
+                // Java plugin is not available
+                return false;
+            }
         }
 
         @Override
         protected JComponent createCenterPanel() {
-            JPanel mainPanel = new JPanel(new BorderLayout());
+            JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+            mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
             // Create root node
             rootNode = new CheckedTreeNode("Project Files");
@@ -88,6 +104,8 @@ public class CopyMateFileExplorerAction extends AnAction {
                             // Set appropriate icon based on file type
                             if (file.isDirectory()) {
                                 renderer.setIcon(AllIcons.Nodes.Folder);
+                            } else if (isJavaAvailable && file.getExtension() != null && file.getExtension().equals("java")) {
+                                renderer.setIcon(AllIcons.FileTypes.Java);
                             } else {
                                 renderer.setIcon(AllIcons.FileTypes.Text);
                             }
@@ -99,12 +117,11 @@ public class CopyMateFileExplorerAction extends AnAction {
                                             : SimpleTextAttributes.REGULAR_ATTRIBUTES
                             );
 
-                            // Add "Copy Methods Only" checkbox for Java files
-                            if (!file.isDirectory() && file.getExtension() != null && file.getExtension().equals("java")) {
-                                if (!methodSignatureCheckboxes.containsKey(file)) {
-                                    JBCheckBox methodCheckbox = new JBCheckBox("Copy Methods Only");
-                                    methodSignatureCheckboxes.put(file, methodCheckbox);
-                                }
+                            // Add path as secondary information
+                            String relativePath = getRelativePath(baseDir, file);
+                            if (!relativePath.isEmpty()) {
+                                renderer.append(" (" + relativePath + ")",
+                                        SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
                             }
                         } else {
                             renderer.append(node.getUserObject().toString(),
@@ -119,55 +136,90 @@ public class CopyMateFileExplorerAction extends AnAction {
             fileTree.setRootVisible(false);  // Hide root node
             fileTree.setShowsRootHandles(true);
 
-            // Add tree selection listener to show/hide method checkboxes
-            fileTree.addTreeSelectionListener(e -> {
-                TreePath path = e.getPath();
-                if (path != null && path.getLastPathComponent() instanceof CheckedTreeNode) {
-                    CheckedTreeNode node = (CheckedTreeNode) path.getLastPathComponent();
-                    if (node.getUserObject() instanceof VirtualFile) {
-                        VirtualFile file = (VirtualFile) node.getUserObject();
-                        updateMethodCheckboxVisibility(file);
-                    }
-                }
-            });
-
             // Wrap tree in scroll pane with improved styling
             JBScrollPane scrollPane = new JBScrollPane(fileTree);
-            scrollPane.setPreferredSize(new Dimension(500, 600));
-            scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            scrollPane.setPreferredSize(new Dimension(550, 500));
 
-            // Method signature panel
-            JPanel methodSignaturePanel = new JPanel();
-            methodSignaturePanel.setLayout(new BoxLayout(methodSignaturePanel, BoxLayout.Y_AXIS));
-            methodSignaturePanel.setBorder(BorderFactory.createTitledBorder("File Options"));
+            // Add tree panel with title
+            JPanel treePanel = new JPanel(new BorderLayout());
+            treePanel.setBorder(BorderFactory.createTitledBorder(
+                    BorderFactory.createLineBorder(new Color(75, 110, 175), 1),
+                    "Project Files",
+                    TitledBorder.LEFT,
+                    TitledBorder.TOP,
+                    null,
+                    new Color(75, 110, 175)
+            ));
+            treePanel.add(scrollPane, BorderLayout.CENTER);
 
-            // Add method signature checkbox to panel
-            for (Map.Entry<VirtualFile, JBCheckBox> entry : methodSignatureCheckboxes.entrySet()) {
-                JPanel filePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-                filePanel.add(new JLabel(entry.getKey().getName()));
-                filePanel.add(entry.getValue());
-                methodSignaturePanel.add(filePanel);
-                // Initially hide all
-                filePanel.setVisible(false);
+            // Create options panel
+            JPanel optionsPanel = new JPanel();
+            optionsPanel.setLayout(new BoxLayout(optionsPanel, BoxLayout.Y_AXIS));
+            optionsPanel.setBorder(BorderFactory.createTitledBorder(
+                    BorderFactory.createLineBorder(new Color(75, 110, 175), 1),
+                    "Copy Options",
+                    TitledBorder.LEFT,
+                    TitledBorder.TOP,
+                    null,
+                    new Color(75, 110, 175)
+            ));
+
+            // Add "Copy Methods Only" checkbox only if Java is available
+            copyMethodsOnlyCheckbox = new JBCheckBox("Copy Java Methods Signatures Only");
+            copyMethodsOnlyCheckbox.setToolTipText("When enabled, only method signatures will be copied for Java files");
+            copyMethodsOnlyCheckbox.setAlignmentX(Component.LEFT_ALIGNMENT);
+            copyMethodsOnlyCheckbox.setEnabled(isJavaAvailable);
+
+            // Add description
+            JLabel optionsDescription;
+            if (isJavaAvailable) {
+                optionsDescription = new JLabel(
+                        "<html>When enabled, Java files will only include class and method signatures.<br>" +
+                                "For all other file types, the full content will be copied.</html>");
+            } else {
+                optionsDescription = new JLabel(
+                        "<html>Java plugin is not available in this IDE.<br>" +
+                                "Method signature extraction is disabled.</html>");
+                optionsDescription.setForeground(Color.RED);
             }
+            optionsDescription.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            JScrollPane methodScrollPane = new JBScrollPane(methodSignaturePanel);
-            methodScrollPane.setPreferredSize(new Dimension(500, 100));
+            optionsPanel.add(copyMethodsOnlyCheckbox);
+            optionsPanel.add(Box.createVerticalStrut(5));
+            optionsPanel.add(optionsDescription);
+            optionsPanel.add(Box.createVerticalStrut(10));
+            optionsPanel.setPreferredSize(new Dimension(550, 100));
 
-            mainPanel.add(scrollPane, BorderLayout.CENTER);
-            mainPanel.add(methodScrollPane, BorderLayout.SOUTH);
+            // Split the main panel
+            JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+            splitPane.setTopComponent(treePanel);
+            splitPane.setBottomComponent(optionsPanel);
+            splitPane.setResizeWeight(0.8);
+            splitPane.setDividerLocation(400);
+
+            mainPanel.add(splitPane, BorderLayout.CENTER);
 
             return mainPanel;
         }
 
-        private void updateMethodCheckboxVisibility(VirtualFile file) {
-            JBCheckBox checkbox = methodSignatureCheckboxes.get(file);
-            if (checkbox != null) {
-                Container parent = checkbox.getParent();
-                if (parent != null) {
-                    parent.setVisible(true);
+        private String getRelativePath(VirtualFile base, VirtualFile file) {
+            String basePath = base.getPath();
+            String filePath = file.getPath();
+
+            if (filePath.startsWith(basePath)) {
+                String relativePath = filePath.substring(basePath.length());
+                if (relativePath.startsWith("/")) {
+                    relativePath = relativePath.substring(1);
+                }
+
+                // Don't show the file name itself in the path
+                int lastSeparator = relativePath.lastIndexOf('/');
+                if (lastSeparator != -1) {
+                    return relativePath.substring(0, lastSeparator);
                 }
             }
+
+            return "";
         }
 
         private void addFilesRecursively(CheckedTreeNode parentNode, VirtualFile directory) {
@@ -189,13 +241,14 @@ public class CopyMateFileExplorerAction extends AnAction {
 
         @Override
         protected JComponent createSouthPanel() {
-            JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+            panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-            // Button styles
+            // Common button styling
             Color buttonColor = new Color(75, 110, 175);
             Color textColor = Color.WHITE;
 
-            // Select/Deselect buttons
+            // Selection buttons
             JButton selectAllButton = new JButton("Select All");
             styleButton(selectAllButton, buttonColor, textColor);
             selectAllButton.addActionListener(e -> selectAllFiles(true));
@@ -214,6 +267,7 @@ public class CopyMateFileExplorerAction extends AnAction {
             styleButton(copyStructureButton, buttonColor, textColor);
             copyStructureButton.addActionListener(e -> copyFileStructure());
 
+            // Add buttons to panel
             panel.add(selectAllButton);
             panel.add(deselectAllButton);
             panel.add(copyContentButton);
@@ -226,6 +280,10 @@ public class CopyMateFileExplorerAction extends AnAction {
             button.setBackground(bgColor);
             button.setForeground(fgColor);
             button.setFocusPainted(false);
+            button.setBorderPainted(false);
+            button.setOpaque(true);
+            button.setPreferredSize(new Dimension(120, 30));
+            button.setFont(button.getFont().deriveFont(Font.BOLD));
         }
 
         private void selectAllFiles(boolean select) {
@@ -241,53 +299,144 @@ public class CopyMateFileExplorerAction extends AnAction {
             }
         }
 
-        // Copy selected content (with method signature option)
         private void copySelectedContent() {
             List<VirtualFile> selectedFiles = new ArrayList<>();
 
             // Traverse the tree and collect selected files
             collectSelectedFiles(rootNode, selectedFiles);
 
-            // Copy selected files to clipboard
-            if (!selectedFiles.isEmpty()) {
-                StringBuilder contentToCopy = new StringBuilder();
-
-                for (VirtualFile file : selectedFiles) {
-                    JBCheckBox methodCheckbox = methodSignatureCheckboxes.get(file);
-                    boolean copyMethodsOnly = methodCheckbox != null && methodCheckbox.isSelected();
-
-                    try {
-                        contentToCopy.append("File Path: ").append(file.getPath()).append("\n");
-
-                        if (copyMethodsOnly && file.getExtension() != null && file.getExtension().equals("java")) {
-                            // Extract method signatures for Java files
-                            String methodSignatures = extractMethodSignatures(file);
-                            contentToCopy.append("Method Signatures:\n").append(methodSignatures);
-                        } else {
-                            // Copy full content for other files
-                            String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
-                            contentToCopy.append("Content:\n").append(content);
-                        }
-
-                        contentToCopy.append("\n\n");
-                    } catch (IOException ioException) {
-                        ioException.printStackTrace();
-                    }
-                }
-
-                // Copy to system clipboard
-                copyToClipboard(contentToCopy.toString());
-            } else {
+            // Check if any files were selected
+            if (selectedFiles.isEmpty()) {
                 JOptionPane.showMessageDialog(
                         null,
                         "No files selected",
                         "Copy Mate",
                         JOptionPane.INFORMATION_MESSAGE
                 );
+                return;
             }
+
+            // Get the checkbox state - only apply if Java is available
+            boolean copyMethodsOnly = isJavaAvailable && copyMethodsOnlyCheckbox.isSelected();
+
+            // Copy selected files to clipboard
+            StringBuilder contentToCopy = new StringBuilder();
+
+            for (VirtualFile file : selectedFiles) {
+                try {
+                    contentToCopy.append("File Path: ").append(file.getPath()).append("\n");
+
+                    if (copyMethodsOnly && file.getExtension() != null && file.getExtension().equals("java")) {
+                        // Extract method signatures for Java files
+                        String methodSignatures = extractMethodSignatures(file);
+                        contentToCopy.append("Method Signatures:\n").append(methodSignatures);
+                    } else {
+                        // Copy full content for other files
+                        String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
+                        contentToCopy.append("Content:\n").append(content);
+                    }
+
+                    contentToCopy.append("\n\n");
+                } catch (IOException ioException) {
+                    contentToCopy.append("Error reading file: ").append(ioException.getMessage()).append("\n\n");
+                }
+            }
+
+            // Copy to system clipboard
+            copyToClipboard(contentToCopy.toString());
         }
 
-        // Copy file structure
+        private String extractMethodSignatures(VirtualFile file) {
+            StringBuilder signatures = new StringBuilder();
+
+            try {
+                // Read file content as text
+                String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
+
+                // Extract package
+                Pattern packagePattern = Pattern.compile("package\\s+([\\w.]+)\\s*;");
+                Matcher packageMatcher = packagePattern.matcher(content);
+                if (packageMatcher.find()) {
+                    signatures.append("package ").append(packageMatcher.group(1)).append(";\n\n");
+                }
+
+                // Track state
+                boolean inClass = false;
+                int braceDepth = 0;
+                StringBuilder currentClass = new StringBuilder();
+
+                // Process line by line
+                String[] lines = content.split("\n");
+                for (String line : lines) {
+                    String trimmedLine = line.trim();
+
+                    // Skip empty lines and comments
+                    if (trimmedLine.isEmpty() || trimmedLine.startsWith("//") || trimmedLine.startsWith("/*") || trimmedLine.startsWith("*")) {
+                        continue;
+                    }
+
+                    // Look for class/interface/enum declarations
+                    if (!inClass && (trimmedLine.matches(".*\\b(class|interface|enum)\\b.*") && !trimmedLine.contains(";"))) {
+                        inClass = true;
+                        currentClass.append(trimmedLine);
+
+                        // If class definition doesn't end with opening brace, just add it
+                        if (!trimmedLine.contains("{")) {
+                            currentClass.append(" {");
+                        }
+
+                        signatures.append(currentClass.toString()).append("\n");
+                        currentClass.setLength(0);
+
+                        // Count braces
+                        for (char c : trimmedLine.toCharArray()) {
+                            if (c == '{') braceDepth++;
+                            if (c == '}') braceDepth--;
+                        }
+                        continue;
+                    }
+
+                    // Look for method declarations when in a class
+                    if (inClass &&
+                            (trimmedLine.matches("\\s*(public|private|protected|static|final|native|synchronized|abstract|transient)+\\s+[\\w\\<\\>\\[\\]]+\\s+[\\w]+\\s*\\([^\\)]*\\).*") ||
+                                    trimmedLine.matches("\\s*[\\w\\<\\>\\[\\]]+\\s+[\\w]+\\s*\\([^\\)]*\\).*")) &&
+                            !trimmedLine.contains(";")) {
+
+                        // Get method signature, removing comments and body
+                        String methodSignature = trimmedLine;
+                        if (methodSignature.contains("{")) {
+                            methodSignature = methodSignature.substring(0, methodSignature.indexOf("{")).trim();
+                        }
+
+                        // Add placeholder for method body
+                        signatures.append("    ").append(methodSignature).append(" {}\n");
+                    }
+
+                    // Count braces to track nesting level
+                    for (char c : trimmedLine.toCharArray()) {
+                        if (c == '{') braceDepth++;
+                        if (c == '}') braceDepth--;
+                    }
+
+                    // If we've exited the class, add closing brace
+                    if (inClass && braceDepth == 0 && trimmedLine.contains("}")) {
+                        signatures.append("}\n\n");
+                        inClass = false;
+                    }
+                }
+
+                // In case we didn't close the class properly
+                if (inClass) {
+                    signatures.append("}\n");
+                }
+
+            } catch (IOException e) {
+                signatures.append("Error extracting method signatures: ").append(e.getMessage());
+            }
+
+            return signatures.toString();
+        }
+
         private void copyFileStructure() {
             List<VirtualFile> selectedFiles = new ArrayList<>();
             List<VirtualFile> selectedDirectories = new ArrayList<>();
@@ -312,7 +461,7 @@ public class CopyMateFileExplorerAction extends AnAction {
                 structureBuilder.append(generateDirectoryStructure(directory, 0));
             }
 
-            // Process individual files
+            // Process individual files that aren't in selected directories
             for (VirtualFile file : selectedFiles) {
                 if (!isChildOfAnyDirectory(file, selectedDirectories)) {
                     structureBuilder.append(file.getName()).append("\n");
@@ -366,60 +515,6 @@ public class CopyMateFileExplorerAction extends AnAction {
             return result.toString();
         }
 
-        private String extractMethodSignatures(VirtualFile file) {
-            StringBuilder signatures = new StringBuilder();
-
-            try {
-                // Read file content as text
-                String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
-
-                // Simple parsing for class and method declarations
-                String[] lines = content.split("\n");
-                StringBuilder currentClass = new StringBuilder();
-                boolean inClass = false;
-
-                for (String line : lines) {
-                    String trimmedLine = line.trim();
-
-                    // Detect class/interface declarations
-                    if (trimmedLine.matches(".*\\b(class|interface|enum)\\b.*\\{.*") ||
-                            (trimmedLine.matches(".*\\b(class|interface|enum)\\b.*") && !trimmedLine.contains(";"))) {
-
-                        currentClass.append(trimmedLine);
-                        if (!trimmedLine.contains("{")) {
-                            currentClass.append(" {");
-                        }
-                        signatures.append(currentClass.toString()).append("\n");
-                        currentClass.setLength(0);
-                        inClass = true;
-                    }
-
-                    // Detect method declarations
-                    if (inClass && trimmedLine.matches(".*\\b(public|private|protected)\\b.*\\(.*\\).*") &&
-                            !trimmedLine.contains(";") && !trimmedLine.contains("//")) {
-
-                        // Eliminate body, keeping just the signature
-                        String methodSig = trimmedLine;
-                        if (methodSig.contains("{")) {
-                            methodSig = methodSig.substring(0, methodSig.indexOf("{")).trim() + " {}";
-                        } else {
-                            methodSig = methodSig + " {}";
-                        }
-
-                        signatures.append("    ").append(methodSig).append("\n");
-                    }
-                }
-
-                if (inClass) {
-                    signatures.append("}\n");
-                }
-
-            } catch (IOException e) {
-                signatures.append("Error extracting methods: ").append(e.getMessage());
-            }
-
-            return signatures.toString();
-        }
         private void collectSelectedFiles(CheckedTreeNode node, List<VirtualFile> selectedFiles) {
             for (int i = 0; i < node.getChildCount(); i++) {
                 CheckedTreeNode childNode = (CheckedTreeNode) node.getChildAt(i);

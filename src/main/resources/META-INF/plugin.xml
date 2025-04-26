@@ -6,18 +6,21 @@
 
   <description><![CDATA[
         A plugin to copy content from multiple files in the project.<br>
+        <br>
         Features:
         <ul>
           <li>Display files with checkboxes for selection</li>
-          <li>Copy file content or method signatures</li>
+          <li>Copy file content or method signatures for Java files</li>
           <li>Copy directory structure</li>
-          <li>Selective copy options per file</li>
+          <li>Simple and intuitive user interface</li>
         </ul>
     ]]></description>
 
+  <!-- Base dependency for all IDEs -->
   <depends>com.intellij.modules.platform</depends>
-  <depends>com.intellij.modules.java</depends>
 
+  <!-- Optional dependency on Java - use only if available -->
+  <depends optional="true">com.intellij.modules.java</depends>
 
   <!-- Register a new action to open the file explorer in the Project view -->
   <actions>
